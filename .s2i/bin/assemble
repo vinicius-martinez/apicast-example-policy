@@ -2,4 +2,4 @@
 
 echo "---> Copying policy source..."
 #cp -Rf /tmp/src/. ./
-cp -Rf /tmp/. ./
+cp -Rf /tmp/ ./
