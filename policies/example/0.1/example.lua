@@ -49,3 +49,6 @@ function _M:balancer()
 end
 
 return _M
+
+local response = string.upper(ngx.arg[1])
+ngx.say(response)
