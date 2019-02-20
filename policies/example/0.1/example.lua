@@ -38,12 +38,11 @@ function _M:header_filter()
 end
 
 function _M.body_filter()
-  if ngx.arg[2] then -- EOF
-    print("Here goes resp body")
-    print(ngx.var.resp_body)
-    ngx.var.resp_body = string.upper(ngx.var.resp_body)
-  end
-  return apicast:body_filter()
+    local resp_body = string.sub(ngx.arg[1], 1, 1000)
+    ngx.ctx.buffered = string.sub((ngx.ctx.buffered or "") .. resp_body, 1, 1000)
+    if ngx.arg[2] then
+      ngx.var.response_body = ngx.ctx.buffered
+      ngx.var.response_body = string.upper(ngx.var.response_body)
 end
 
 function _M:log()
