@@ -1,11 +1,6 @@
-set $response_body ''; 
-
 local apicast = require('apicast').new()
-
-local setmetatable = setmetatable
-
-local _M = require('apicast.policy').new('Example', '0.1')
-local mt = { __index = _M }
+local _M = { _VERSION = apicast._VERSION, _NAME = 'APIcast with transformation' }
+local mt = { __index = setmetatable(_M, { __index = apicast }) }
 
 function _M.new()
   return setmetatable({}, mt)
@@ -40,11 +35,31 @@ function _M:header_filter()
 end
 
 function _M.body_filter()
-    local resp_body = string.sub(ngx.arg[1], 1, 1000)
-    ngx.ctx.buffered = string.sub((ngx.ctx.buffered or "") .. resp_body, 1, 1000)
-    if ngx.arg[2] then
-      ngx.var.response_body = ngx.ctx.buffered
-      ngx.var.response_body = string.upper(ngx.var.response_body)
+local ctx = ngx.ctx
+  if ctx.buffers == nil then
+    ctx.buffers = {}
+    ctx.nbuffers = 0
+  end
+
+  local data, eof = ngx.arg[1], ngx.arg[2]
+  local next_idx = ctx.nbuffers + 1
+
+  if not eof then
+      if data then
+    ctx.buffers[next_idx] = data
+    ctx.nbuffers = next_idx
+    -- Send nothing to the client yet.
+    ngx.arg[1] = nil
+    end
+    return -- NEXT data
+  elseif data then
+    ctx.buffers[next_idx] = data
+    ctx.nbuffers = next_idx
+  end
+
+  ngx.arg[1] = string.upper(table.concat(ngx.ctx.buffers))
+
+  return apicast:body_filter()
 end
 
 function _M:log()
