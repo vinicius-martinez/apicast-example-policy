@@ -1,3 +1,5 @@
+local apicast = require('apicast').new()
+
 local setmetatable = setmetatable
 
 local _M = require('apicast.policy').new('Example', '0.1')
@@ -36,32 +38,46 @@ function _M:header_filter()
 end
 
 function _M.body_filter()
-  local ctx = ngx.ctx
-  if ctx.buffers == nil then
-    ctx.buffers = {}
-    ctx.nbuffers = 0
-  end
+  ngx.ctx.buffered = (ngx.ctx.buffered or "") .. ngx.arg[1]
 
-  local data, eof = ngx.arg[1], ngx.arg[2]
-  local next_idx = ctx.nbuffers + 1
+  if ngx.arg[2] then -- EOF
+    local dict = {}
 
-  if not eof then
-      if data then
-    ctx.buffers[next_idx] = data
-    ctx.nbuffers = next_idx
-    -- Send nothing to the client yet.
-    ngx.arg[1] = nil
+    -- Gather information of the request
+    local request = {}
+    if ngx.var.request_body then
+      if (base64_flag == 'true') then
+        request["body"] = ngx.encode_base64(ngx.var.request_body)
+      else
+        request["body"] = ngx.var.request_body
+      end
     end
-    return -- NEXT data
-  elseif data then
-    ctx.buffers[next_idx] = data
-    ctx.nbuffers = next_idx
-  end
+    request["headers"] = ngx.req.get_headers()
+    request["start_time"] = ngx.req.start_time()
+    request["http_version"] = ngx.req.http_version()
+    if (base64_flag == 'true') then
+      request["raw"] = ngx.encode_base64(ngx.req.raw_header())
+    else
+      request["raw"] = ngx.req.raw_header()
+    end
 
-  local m = ngx.re.match(ngx.var.request_uri, [=[(\/[^%?]+)(%??.*)]=])
+    request["method"] = ngx.req.get_method()
+    request["uri_args"] = ngx.req.get_uri_args()
+    request["request_id"] = ngx.var.request_id
+    dict["request"] = request
 
-  if m then
-    ngx.arg[1] = string.upper(table.concat(ngx.ctx.buffers))
+    -- Gather information of the response
+    local response = {}
+    if ngx.ctx.buffered then
+      if (base64_flag == 'true') then
+        response["body"] = string.upper(ngx.encode_base64(ngx.ctx.buffered))
+      else
+        response["body"] = string.upper(ngx.ctx.buffered)
+      end
+    end
+    response["headers"] = ngx.resp.get_headers()
+    response["status"] = ngx.status
+    dict["response"] = response
   end
   return apicast:body_filter()
 end
