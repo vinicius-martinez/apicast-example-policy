@@ -35,8 +35,35 @@ function _M:header_filter()
   -- can change response headers
 end
 
-function _M:body_filter()
-  ngx.ctx.response_body = string.upper(ngx.ctx.response_body)
+function _M.body_filter()
+  local ctx = ngx.ctx
+  if ctx.buffers == nil then
+    ctx.buffers = {}
+    ctx.nbuffers = 0
+  end
+
+  local data, eof = ngx.arg[1], ngx.arg[2]
+  local next_idx = ctx.nbuffers + 1
+
+  if not eof then
+      if data then
+    ctx.buffers[next_idx] = data
+    ctx.nbuffers = next_idx
+    -- Send nothing to the client yet.
+    ngx.arg[1] = nil
+    end
+    return -- NEXT data
+  elseif data then
+    ctx.buffers[next_idx] = data
+    ctx.nbuffers = next_idx
+  end
+
+  local m = ngx.re.match(ngx.var.request_uri, [=[(\/[^%?]+)(%??.*)]=])
+
+  if m then
+    ngx.arg[1] = string.upper(table.concat(ngx.ctx.buffers))
+  end
+  return apicast:body_filter()
 end
 
 function _M:log()
