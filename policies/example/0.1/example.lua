@@ -1,3 +1,5 @@
+set $response_body ''; 
+
 local apicast = require('apicast').new()
 
 local setmetatable = setmetatable
